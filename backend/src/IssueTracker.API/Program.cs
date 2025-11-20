@@ -1,3 +1,5 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using IssueTracker.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +22,16 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+// AutoMapper configuration
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+// FluentValidation configuration
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<IssueTracker.Application.DTOs.CreateIssueDto>();
+
+// Register application services
+builder.Services.AddScoped<IssueTracker.Application.Interfaces.IIssueService, IssueTracker.Application.Services.IssueService>();
 
 builder.Services.AddControllers();
 
