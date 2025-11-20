@@ -34,6 +34,10 @@ builder.Services.AddValidatorsFromAssemblyContaining<IssueTracker.Application.DT
 // Register application services
 builder.Services.AddScoped<IssueTracker.Application.Interfaces.IIssueService, IssueTracker.Application.Services.IssueService>();
 
+// Register global exception handler
+builder.Services.AddExceptionHandler<IssueTracker.API.Middleware.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddControllers();
 
 // Swagger/OpenAPI configuration
@@ -52,6 +56,10 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// Global exception handling middleware
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

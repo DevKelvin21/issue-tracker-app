@@ -53,13 +53,6 @@ public class IssuesController : ControllerBase
         _logger.LogInformation("Getting issue with ID: {IssueId}", id);
 
         var issue = await _issueService.GetByIdAsync(id);
-
-        if (issue == null)
-        {
-            _logger.LogWarning("Issue with ID {IssueId} not found", id);
-            return NotFound(new { message = $"Issue with ID {id} not found" });
-        }
-
         return Ok(issue);
     }
 
@@ -103,13 +96,6 @@ public class IssuesController : ControllerBase
         _logger.LogInformation("Updating issue with ID: {IssueId}", id);
 
         var issue = await _issueService.UpdateAsync(id, updateDto);
-
-        if (issue == null)
-        {
-            _logger.LogWarning("Issue with ID {IssueId} not found for update", id);
-            return NotFound(new { message = $"Issue with ID {id} not found" });
-        }
-
         return Ok(issue);
     }
 
@@ -128,13 +114,6 @@ public class IssuesController : ControllerBase
         _logger.LogInformation("Resolving issue with ID: {IssueId}", id);
 
         var issue = await _issueService.ResolveAsync(id);
-
-        if (issue == null)
-        {
-            _logger.LogWarning("Issue with ID {IssueId} not found for resolve", id);
-            return NotFound(new { message = $"Issue with ID {id} not found" });
-        }
-
         return Ok(issue);
     }
 
@@ -152,14 +131,7 @@ public class IssuesController : ControllerBase
     {
         _logger.LogInformation("Deleting issue with ID: {IssueId}", id);
 
-        var result = await _issueService.DeleteAsync(id);
-
-        if (!result)
-        {
-            _logger.LogWarning("Issue with ID {IssueId} not found for deletion", id);
-            return NotFound(new { message = $"Issue with ID {id} not found" });
-        }
-
+        await _issueService.DeleteAsync(id);
         return NoContent();
     }
 }

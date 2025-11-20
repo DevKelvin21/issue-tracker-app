@@ -1,5 +1,6 @@
 using AutoMapper;
 using IssueTracker.Application.DTOs;
+using IssueTracker.Application.Exceptions;
 using IssueTracker.Application.Interfaces;
 using IssueTracker.Core.Entities;
 using IssueTracker.Core.Enums;
@@ -57,7 +58,7 @@ public class IssueService : IIssueService
         if (issue == null)
         {
             _logger.LogWarning("Issue with ID {IssueId} not found", id);
-            return null;
+            throw new NotFoundException("Issue", id);
         }
 
         return _mapper.Map<IssueDto>(issue);
@@ -86,7 +87,7 @@ public class IssueService : IIssueService
         if (issue == null)
         {
             _logger.LogWarning("Issue with ID {IssueId} not found for update", id);
-            return null;
+            throw new NotFoundException("Issue", id);
         }
 
         // Map non-null properties from updateDto to issue
@@ -132,7 +133,7 @@ public class IssueService : IIssueService
         if (issue == null)
         {
             _logger.LogWarning("Issue with ID {IssueId} not found for resolve", id);
-            return null;
+            throw new NotFoundException("Issue", id);
         }
 
         issue.Status = IssueStatus.Resolved;
@@ -154,7 +155,7 @@ public class IssueService : IIssueService
         if (issue == null)
         {
             _logger.LogWarning("Issue with ID {IssueId} not found for deletion", id);
-            return false;
+            throw new NotFoundException("Issue", id);
         }
 
         _context.Issues.Remove(issue);
