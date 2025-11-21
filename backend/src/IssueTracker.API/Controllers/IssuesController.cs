@@ -1,6 +1,7 @@
 using IssueTracker.Application.DTOs;
 using IssueTracker.Application.Interfaces;
 using IssueTracker.Core.Enums;
+using IssueTracker.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IssueTracker.API.Controllers;
@@ -23,36 +24,51 @@ public class IssuesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all issues, optionally filtered by status
+    /// Get a paginated list of issues, optionally filtered by status
     /// </summary>
     /// <param name="status">Optional status filter (Open, InProgress, Resolved)</param>
-    /// <returns>List of issues</returns>
-    /// <response code="200">Returns the list of issues</response>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Page size (default: 20, max: 100)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Paginated list of issues</returns>
+    /// <response code="200">Returns the paginated list of issues</response>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<IssueDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<IssueDto>>> GetAll([FromQuery] IssueStatus? status = null)
+    [ProducesResponseType(typeof(PagedResult<IssueDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<IssueDto>>> GetAll(
+        [FromQuery] IssueStatus? status = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting all issues with status filter: {Status}", status?.ToString() ?? "None");
+        // Enforce limits
+        if (pageSize > 100) pageSize = 100;
+        if (pageSize < 1) pageSize = 20;
+        if (pageNumber < 1) pageNumber = 1;
 
-        var issues = await _issueService.GetAllAsync(status);
-        return Ok(issues);
+        _logger.LogInformation(
+            "Getting issues page {PageNumber} with status filter: {Status}",
+            pageNumber, status?.ToString() ?? "None");
+
+        var result = await _issueService.GetPagedAsync(status, pageNumber, pageSize, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
     /// Get a specific issue by ID
     /// </summary>
     /// <param name="id">Issue ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The requested issue</returns>
     /// <response code="200">Returns the issue</response>
     /// <response code="404">Issue not found</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(IssueDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IssueDto>> GetById(int id)
+    public async Task<ActionResult<IssueDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting issue with ID: {IssueId}", id);
 
-        var issue = await _issueService.GetByIdAsync(id);
+        var issue = await _issueService.GetByIdAsync(id, cancellationToken);
         return Ok(issue);
     }
 
@@ -60,17 +76,20 @@ public class IssuesController : ControllerBase
     /// Create a new issue
     /// </summary>
     /// <param name="createDto">Issue creation details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created issue</returns>
     /// <response code="201">Issue created successfully</response>
     /// <response code="400">Invalid request data</response>
     [HttpPost]
     [ProducesResponseType(typeof(IssueDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<IssueDto>> Create([FromBody] CreateIssueDto createDto)
+    public async Task<ActionResult<IssueDto>> Create(
+        [FromBody] CreateIssueDto createDto,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating new issue with title: {Title}", createDto.Title);
 
-        var issue = await _issueService.CreateAsync(createDto);
+        var issue = await _issueService.CreateAsync(createDto, cancellationToken);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -83,6 +102,7 @@ public class IssuesController : ControllerBase
     /// </summary>
     /// <param name="id">Issue ID</param>
     /// <param name="updateDto">Issue update details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The updated issue</returns>
     /// <response code="200">Issue updated successfully</response>
     /// <response code="404">Issue not found</response>
@@ -91,11 +111,14 @@ public class IssuesController : ControllerBase
     [ProducesResponseType(typeof(IssueDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<IssueDto>> Update(int id, [FromBody] UpdateIssueDto updateDto)
+    public async Task<ActionResult<IssueDto>> Update(
+        int id,
+        [FromBody] UpdateIssueDto updateDto,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating issue with ID: {IssueId}", id);
 
-        var issue = await _issueService.UpdateAsync(id, updateDto);
+        var issue = await _issueService.UpdateAsync(id, updateDto, cancellationToken);
         return Ok(issue);
     }
 
@@ -103,17 +126,18 @@ public class IssuesController : ControllerBase
     /// Mark an issue as resolved
     /// </summary>
     /// <param name="id">Issue ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The resolved issue</returns>
     /// <response code="200">Issue resolved successfully</response>
     /// <response code="404">Issue not found</response>
     [HttpPatch("{id}/resolve")]
     [ProducesResponseType(typeof(IssueDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IssueDto>> Resolve(int id)
+    public async Task<ActionResult<IssueDto>> Resolve(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Resolving issue with ID: {IssueId}", id);
 
-        var issue = await _issueService.ResolveAsync(id);
+        var issue = await _issueService.ResolveAsync(id, cancellationToken);
         return Ok(issue);
     }
 
@@ -121,17 +145,18 @@ public class IssuesController : ControllerBase
     /// Delete an issue
     /// </summary>
     /// <param name="id">Issue ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>No content</returns>
     /// <response code="204">Issue deleted successfully</response>
     /// <response code="404">Issue not found</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting issue with ID: {IssueId}", id);
 
-        await _issueService.DeleteAsync(id);
+        await _issueService.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
 }

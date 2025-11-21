@@ -35,6 +35,9 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<IssueTracker.Application.DTOs.CreateIssueDto>();
 
+// Register repositories
+builder.Services.AddScoped<IssueTracker.Core.Interfaces.IIssueRepository, IssueTracker.Infrastructure.Repositories.IssueRepository>();
+
 // Register application services
 builder.Services.AddScoped<IssueTracker.Application.Interfaces.IIssueService, IssueTracker.Application.Services.IssueService>();
 

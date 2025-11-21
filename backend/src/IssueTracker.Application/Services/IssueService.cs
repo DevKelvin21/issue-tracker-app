@@ -4,8 +4,7 @@ using IssueTracker.Application.Exceptions;
 using IssueTracker.Application.Interfaces;
 using IssueTracker.Core.Entities;
 using IssueTracker.Core.Enums;
-using IssueTracker.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
+using IssueTracker.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 
 namespace IssueTracker.Application.Services;
@@ -15,45 +14,59 @@ namespace IssueTracker.Application.Services;
 /// </summary>
 public class IssueService : IIssueService
 {
-    private readonly IssueTrackerDbContext _context;
+    private readonly IIssueRepository _repository;
     private readonly IMapper _mapper;
     private readonly ILogger<IssueService> _logger;
 
     public IssueService(
-        IssueTrackerDbContext context,
+        IIssueRepository repository,
         IMapper mapper,
         ILogger<IssueService> logger)
     {
-        _context = context;
+        _repository = repository;
         _mapper = mapper;
         _logger = logger;
     }
 
-    public async Task<IEnumerable<IssueDto>> GetAllAsync(IssueStatus? status = null)
+    public async Task<IEnumerable<IssueDto>> GetAllAsync(
+        IssueStatus? status = null,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Fetching all issues with status filter: {Status}", status?.ToString() ?? "None");
 
-        var query = _context.Issues.AsNoTracking();
-
-        if (status.HasValue)
-        {
-            query = query.Where(i => i.Status == status.Value);
-        }
-
-        var issues = await query
-            .OrderByDescending(i => i.CreatedAt)
-            .ToListAsync();
+        var issues = await _repository.GetAllAsync(status, cancellationToken);
 
         return _mapper.Map<IEnumerable<IssueDto>>(issues);
     }
 
-    public async Task<IssueDto?> GetByIdAsync(int id)
+    public async Task<PagedResult<IssueDto>> GetPagedAsync(
+        IssueStatus? status,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Fetching issues page {PageNumber} with page size {PageSize} and status filter: {Status}",
+            pageNumber, pageSize, status?.ToString() ?? "None");
+
+        var pagedIssues = await _repository.GetPagedAsync(status, pageNumber, pageSize, cancellationToken);
+
+        var dtos = _mapper.Map<IEnumerable<IssueDto>>(pagedIssues.Items);
+
+        return new PagedResult<IssueDto>
+        {
+            Items = dtos,
+            PageNumber = pagedIssues.PageNumber,
+            PageSize = pagedIssues.PageSize,
+            TotalCount = pagedIssues.TotalCount
+        };
+    }
+
+    public async Task<IssueDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Fetching issue with ID: {IssueId}", id);
 
-        var issue = await _context.Issues
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == id);
+        var issue = await _repository.GetByIdAsync(id, cancellationToken);
 
         if (issue == null)
         {
@@ -64,25 +77,25 @@ public class IssueService : IIssueService
         return _mapper.Map<IssueDto>(issue);
     }
 
-    public async Task<IssueDto> CreateAsync(CreateIssueDto createDto)
+    public async Task<IssueDto> CreateAsync(CreateIssueDto createDto, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating new issue with title: {Title}", createDto.Title);
 
         var issue = _mapper.Map<Issue>(createDto);
 
-        _context.Issues.Add(issue);
-        await _context.SaveChangesAsync();
+        await _repository.AddAsync(issue, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Created issue with ID: {IssueId}", issue.Id);
 
         return _mapper.Map<IssueDto>(issue);
     }
 
-    public async Task<IssueDto?> UpdateAsync(int id, UpdateIssueDto updateDto)
+    public async Task<IssueDto?> UpdateAsync(int id, UpdateIssueDto updateDto, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating issue with ID: {IssueId}", id);
 
-        var issue = await _context.Issues.FindAsync(id);
+        var issue = await _repository.GetByIdAsync(id, cancellationToken);
 
         if (issue == null)
         {
@@ -101,34 +114,44 @@ public class IssueService : IIssueService
             issue.Description = updateDto.Description;
         }
 
+        // Apply status change business logic
         if (updateDto.Status.HasValue)
         {
-            issue.Status = updateDto.Status.Value;
-
-            // Set ResolvedAt if status is Resolved
-            if (updateDto.Status.Value == IssueStatus.Resolved && issue.ResolvedAt == null)
-            {
-                issue.ResolvedAt = DateTime.UtcNow;
-            }
-            // Clear ResolvedAt if status is not Resolved
-            else if (updateDto.Status.Value != IssueStatus.Resolved)
-            {
-                issue.ResolvedAt = null;
-            }
+            ApplyStatusChange(issue, updateDto.Status.Value);
         }
 
-        await _context.SaveChangesAsync();
+        await _repository.UpdateAsync(issue, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Updated issue with ID: {IssueId}", id);
 
         return _mapper.Map<IssueDto>(issue);
     }
 
-    public async Task<IssueDto?> ResolveAsync(int id)
+    /// <summary>
+    /// Applies status change business logic
+    /// </summary>
+    private void ApplyStatusChange(Issue issue, IssueStatus newStatus)
+    {
+        issue.Status = newStatus;
+
+        // Set ResolvedAt if status is Resolved
+        if (newStatus == IssueStatus.Resolved && issue.ResolvedAt == null)
+        {
+            issue.ResolvedAt = DateTime.UtcNow;
+        }
+        // Clear ResolvedAt if status is not Resolved
+        else if (newStatus != IssueStatus.Resolved)
+        {
+            issue.ResolvedAt = null;
+        }
+    }
+
+    public async Task<IssueDto?> ResolveAsync(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Resolving issue with ID: {IssueId}", id);
 
-        var issue = await _context.Issues.FindAsync(id);
+        var issue = await _repository.GetByIdAsync(id, cancellationToken);
 
         if (issue == null)
         {
@@ -139,18 +162,19 @@ public class IssueService : IIssueService
         issue.Status = IssueStatus.Resolved;
         issue.ResolvedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _repository.UpdateAsync(issue, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Resolved issue with ID: {IssueId}", id);
 
         return _mapper.Map<IssueDto>(issue);
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting issue with ID: {IssueId}", id);
 
-        var issue = await _context.Issues.FindAsync(id);
+        var issue = await _repository.GetByIdAsync(id, cancellationToken);
 
         if (issue == null)
         {
@@ -158,8 +182,8 @@ public class IssueService : IIssueService
             throw new NotFoundException("Issue", id);
         }
 
-        _context.Issues.Remove(issue);
-        await _context.SaveChangesAsync();
+        await _repository.DeleteAsync(issue, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Deleted issue with ID: {IssueId}", id);
 
