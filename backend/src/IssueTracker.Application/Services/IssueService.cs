@@ -103,18 +103,8 @@ public class IssueService : IIssueService
             throw new NotFoundException("Issue", id);
         }
 
-        // Map non-null properties from updateDto to issue
-        if (!string.IsNullOrWhiteSpace(updateDto.Title))
-        {
-            issue.Title = updateDto.Title;
-        }
+        _mapper.Map(updateDto, issue);
 
-        if (!string.IsNullOrWhiteSpace(updateDto.Description))
-        {
-            issue.Description = updateDto.Description;
-        }
-
-        // Apply status change business logic
         if (updateDto.Status.HasValue)
         {
             ApplyStatusChange(issue, updateDto.Status.Value);
@@ -135,12 +125,10 @@ public class IssueService : IIssueService
     {
         issue.Status = newStatus;
 
-        // Set ResolvedAt if status is Resolved
         if (newStatus == IssueStatus.Resolved && issue.ResolvedAt == null)
         {
             issue.ResolvedAt = DateTime.UtcNow;
         }
-        // Clear ResolvedAt if status is not Resolved
         else if (newStatus != IssueStatus.Resolved)
         {
             issue.ResolvedAt = null;

@@ -27,6 +27,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.ResolvedAt, opt => opt.Ignore())
-            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+            .ForMember(dest => dest.Status, opt => opt.Ignore()) // Handled separately with business logic
+            .ForMember(dest => dest.Title, opt => opt.Condition(src => !string.IsNullOrWhiteSpace(src.Title)))
+            .ForMember(dest => dest.Description, opt => opt.Condition(src => !string.IsNullOrWhiteSpace(src.Description)));
     }
 }
