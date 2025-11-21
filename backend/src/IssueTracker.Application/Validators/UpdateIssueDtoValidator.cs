@@ -4,7 +4,7 @@ using IssueTracker.Application.DTOs;
 namespace IssueTracker.Application.Validators;
 
 /// <summary>
-/// Validator for UpdateIssueDto
+/// Validator for UpdateIssueDto with XSS protection
 /// </summary>
 public class UpdateIssueDtoValidator : AbstractValidator<UpdateIssueDto>
 {
@@ -14,12 +14,16 @@ public class UpdateIssueDtoValidator : AbstractValidator<UpdateIssueDto>
             .MaximumLength(200).WithMessage("Title cannot exceed 200 characters")
             .Must(title => string.IsNullOrEmpty(title) || !string.IsNullOrWhiteSpace(title))
                 .WithMessage("Title cannot be only whitespace")
+            .Must(ValidationHelper.IsSafeFromXss)
+                .WithMessage("Title contains invalid or potentially dangerous content")
             .When(x => x.Title != null);
 
         RuleFor(x => x.Description)
             .MaximumLength(2000).WithMessage("Description cannot exceed 2000 characters")
             .Must(desc => string.IsNullOrEmpty(desc) || !string.IsNullOrWhiteSpace(desc))
                 .WithMessage("Description cannot be only whitespace")
+            .Must(ValidationHelper.IsSafeFromXss)
+                .WithMessage("Description contains invalid or potentially dangerous content")
             .When(x => x.Description != null);
 
         RuleFor(x => x.Status)
