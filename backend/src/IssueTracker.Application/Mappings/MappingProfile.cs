@@ -13,9 +13,7 @@ public class MappingProfile : Profile
     public MappingProfile()
     {
         // Issue entity to IssueDto
-        CreateMap<Issue, IssueDto>()
-            .ForMember(dest => dest.Status,
-                opt => opt.MapFrom(src => src.Status.ToString()));
+        CreateMap<Issue, IssueDto>();
 
         // CreateIssueDto to Issue entity
         CreateMap<CreateIssueDto, Issue>()

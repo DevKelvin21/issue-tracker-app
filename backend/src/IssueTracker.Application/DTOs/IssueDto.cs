@@ -1,3 +1,5 @@
+using IssueTracker.Core.Enums;
+
 namespace IssueTracker.Application.DTOs;
 
 /// <summary>
@@ -23,7 +25,7 @@ public class IssueDto
     /// <summary>
     /// Current status of the issue
     /// </summary>
-    public string Status { get; set; } = string.Empty;
+    public IssueStatus Status { get; set; }
 
     /// <summary>
     /// Date and time when the issue was created
